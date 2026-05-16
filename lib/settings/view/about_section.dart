@@ -4,16 +4,14 @@ import 'package:path/path.dart' as p;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:yaru/yaru.dart';
 
+import '../../app/app_config.dart';
 import '../../app/app_manager.dart';
 import '../../app/connectivity_manager.dart';
-import '../../app/app_config.dart';
 import '../../common/view/progress.dart';
 import '../../common/view/tapable_text.dart';
-import '../../common/view/ui_constants.dart';
 import '../../extensions/build_context_x.dart';
 import '../../extensions/theme_data_x.dart';
 import '../../l10n/l10n.dart';
-import '../settings_model.dart';
 import 'about_page.dart';
 import 'licenses_dialog.dart';
 
@@ -25,7 +23,6 @@ class AboutSection extends StatelessWidget with WatchItMixin {
     final text = '${context.l10n.about} ${AppConfig.appTitle}';
     return YaruSection(
       headline: Text(text),
-      margin: const EdgeInsets.all(kLargestSpace),
       child: const Column(children: [_AboutTile(), _LicenseTile()]),
     );
   }
@@ -38,8 +35,12 @@ class _AboutTile extends StatelessWidget with WatchItMixin {
   Widget build(BuildContext context) {
     callOnceAfterThisBuild((context) {
       final appManager = di<AppManager>();
-      appManager.checkForUpdateCommand.run();
-      appManager.fetchNumberOfDownloadsCommand.run();
+      if (appManager.checkForUpdateCommand.value == null) {
+        appManager.checkForUpdateCommand.run();
+      }
+      if (appManager.fetchNumberOfDownloadsCommand.value == 0) {
+        appManager.fetchNumberOfDownloadsCommand.run();
+      }
     });
 
     final theme = context.theme;
@@ -53,9 +54,6 @@ class _AboutTile extends StatelessWidget with WatchItMixin {
       (AppManager m) => m.fetchNumberOfDownloadsCommand,
     );
     final currentVersion = di<AppManager>().version;
-    final useYaruTheme = watchPropertyValue(
-      (SettingsModel m) => m.useYaruTheme,
-    );
 
     final isOnline = watchValue(
       (ConnectivityManager m) =>
@@ -68,11 +66,9 @@ class _AboutTile extends StatelessWidget with WatchItMixin {
       title: !isOnline || !appManager.allowManualUpdate
           ? Text(di<AppManager>().version)
           : updateAvailableResults.isRunning
-          ? Center(
-              child: SizedBox.square(
-                dimension: useYaruTheme ? kYaruTitleBarItemHeight : 40,
-                child: const Progress(padding: EdgeInsets.all(10)),
-              ),
+          ? const SizedBox.square(
+              dimension: 15,
+              child: Progress(padding: EdgeInsets.all(10), strokeWidth: 2),
             )
           : TapAbleText(
               text: updateAvailable
@@ -92,10 +88,7 @@ class _AboutTile extends StatelessWidget with WatchItMixin {
               ),
             ),
       trailing: OutlinedButton(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (context) => const AboutDialog(),
-        ),
+        onPressed: () => context.dialog((context) => const AboutDialog()),
         child: Text(context.l10n.contributors),
       ),
     );
@@ -110,10 +103,7 @@ class _LicenseTile extends StatelessWidget {
     return YaruTile(
       title: TapAbleText(text: '${context.l10n.license}: GPL3'),
       trailing: OutlinedButton(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (context) => const LicensesDialog(),
-        ),
+        onPressed: () => context.dialog((context) => const LicensesDialog()),
         child: Text(context.l10n.dependencies),
       ),
       enabled: true,

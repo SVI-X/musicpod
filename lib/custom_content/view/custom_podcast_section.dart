@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_it/flutter_it.dart';
 
 import '../../app/routing_manager.dart';
-import '../../common/view/snackbars.dart';
 import '../../common/view/ui_constants.dart';
+import '../../extensions/build_context_x.dart';
 import '../../l10n/l10n.dart';
 import '../../podcasts/podcast_manager.dart';
 import '../../podcasts/view/lazy_podcast_page.dart';
@@ -64,19 +64,13 @@ class _CustomPodcastSectionState extends State<CustomPodcastSection> {
                               ))
                               .then((v) {
                                 if (v.isEmpty && context.mounted) {
-                                  showSnackBar(
-                                    context: context,
-                                    content: Text(context.l10n.noPodcastFound),
+                                  context.toast(
+                                    Text(context.l10n.noPodcastFound),
                                   );
                                 } else {
                                   di<RoutingManager>().push(
                                     pageId: _urlController.text,
                                     builder: (context) => LazyPodcastPage(
-                                      updateMessage:
-                                          context.l10n.newEpisodeAvailable,
-                                      multiUpdateMessage: (length) => context
-                                          .l10n
-                                          .newEpisodesAvailableFor(length),
                                       imageUrl: v.firstOrNull?.imageUrl,
                                       feedUrl: _urlController.text,
                                     ),

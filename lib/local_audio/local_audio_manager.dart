@@ -123,6 +123,7 @@ class LocalAudioManager extends SafeChangeNotifier {
       Command.createAsyncNoParam(
         _localAudioService.areTracksSynced,
         initialValue: true,
+        errorFilter: NoErrorFilter(),
       );
 
   late final Command<
@@ -225,9 +226,21 @@ class LocalAudioManager extends SafeChangeNotifier {
 
   bool isPinnedAlbum(int id) => _localAudioService.isPinnedAlbum(id);
 
-  void pinAlbum(int id, {required Function() onFail}) =>
-      _localAudioService.pinAlbum(id, onFail: onFail);
+  void pinAlbum(
+    int id, {
+    // TODO: replace with command and sideeffect
+    required Function() onFail,
+  }) => _localAudioService.pinAlbum(id, onFail: onFail);
 
-  void unpinAlbum(int id, {required Function() onFail}) =>
-      _localAudioService.unpinAlbum(id, onFail: onFail);
+  void unpinAlbum(
+    int id, {
+    // TODO: replace with command and sideeffect
+    required Function() onFail,
+  }) => _localAudioService.unpinAlbum(id, onFail: onFail);
+}
+
+class NoErrorFilter extends ErrorFilter {
+  @override
+  ErrorReaction filter(Object error, StackTrace stackTrace) =>
+      ErrorReaction.throwException;
 }

@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_it/flutter_it.dart';
 import 'package:super_drag_and_drop/super_drag_and_drop.dart';
 
+import '../../app/page_ids.dart';
 import '../../app/routing_manager.dart';
 import '../../common/data/audio.dart';
 import '../../common/data/audio_type.dart';
 import '../../common/logging.dart';
-import '../../app/page_ids.dart';
 import '../../common/view/adaptive_multi_layout_body.dart';
 import '../../common/view/audio_page_header.dart';
 import '../../common/view/audio_page_type.dart';
@@ -17,9 +17,9 @@ import '../../common/view/genre_bar.dart';
 import '../../common/view/header_bar.dart';
 import '../../common/view/search_button.dart';
 import '../../common/view/sliver_audio_tile_list.dart';
-import '../../common/view/snackbars.dart';
 import '../../common/view/theme.dart';
 import '../../common/view/ui_constants.dart';
+import '../../extensions/build_context_x.dart';
 import '../../l10n/l10n.dart';
 import '../../local_audio/local_audio_manager.dart';
 import '../../local_audio/view/album_page.dart';
@@ -28,6 +28,7 @@ import '../../local_audio/view/failed_import_snackbar.dart';
 import '../../player/player_model.dart';
 import '../../search/search_model.dart';
 import '../../search/search_type.dart';
+import '../../settings/settings_model.dart';
 import 'playlist_add_audio_autocomplete.dart';
 import 'playlist_control_panel.dart';
 import 'playlist_header_image.dart';
@@ -127,10 +128,7 @@ class PlaylistPage extends StatelessWidget with WatchItMixin {
           ),
           onAlbumTap: (audio) {
             if (audio.albumDbId == null) {
-              showSnackBar(
-                context: context,
-                content: Text(context.l10n.nothingFound),
-              );
+              context.toast(Text(context.l10n.nothingFound));
               return;
             }
             di<RoutingManager>().push(
@@ -170,6 +168,9 @@ class _PlaylistPageBody extends StatelessWidget with WatchItMixin {
     final isPlaying = watchPropertyValue((PlayerModel m) => m.isPlaying);
     final localAudioManager = di<LocalAudioManager>();
     final playerModel = di<PlayerModel>();
+    final autoMovePlayer = watchPropertyValue(
+      (SettingsModel m) => m.autoMovePlayer,
+    );
     final currentAudio = watchPropertyValue((PlayerModel m) => m.audio);
 
     final audioPageHeader = AudioPageHeader(
@@ -197,92 +198,101 @@ class _PlaylistPageBody extends StatelessWidget with WatchItMixin {
         padding: const EdgeInsets.only(top: kLargestSpace),
         child: PlaylistAddAudioAutoCompleteOrShrink(pageId: pageId),
       ),
-      sliverBody: (constraints) => allowReorder
-          ? SliverReorderableList(
-              itemCount: audios.length,
-              itemBuilder: (BuildContext context, int index) {
-                final audio = audios.elementAt(index);
-                final audioSelected = currentAudio == audio;
+      sliverBody: (constraints) {
+        final mqSize = constraints.maxWidth;
+        final playerToTheRight = mqSize > kSideBarThreshHold;
 
-                return ReorderableDragStartListener(
-                  key: ValueKey(audio.path ?? audio.url),
-                  index: index,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 5),
-                    child: AudioTile(
-                      allowLeadingImage: audios.length < kShowLeadingThreshold,
-                      onSubTitleTap: onArtistTap,
-                      onSubSubTitleTap: onAlbumTap,
-                      key: ValueKey(audio.path ?? audio.url),
-                      isPlayerPlaying: isPlaying,
-                      onTap: () {
-                        if (audioSelected) {
-                          if (isPlaying) {
-                            playerModel.pause();
+        final width = autoMovePlayer && playerToTheRight
+            ? mqSize - kSideBarPlayerWidth
+            : mqSize;
+        return allowReorder
+            ? SliverReorderableList(
+                itemCount: audios.length,
+                itemBuilder: (BuildContext context, int index) {
+                  final audio = audios.elementAt(index);
+                  final audioSelected = currentAudio == audio;
+
+                  return ReorderableDragStartListener(
+                    key: ValueKey(audio.path ?? audio.url),
+                    index: index,
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 5),
+                      child: AudioTile(
+                        showSubSubTitle: width > 1200,
+                        showDuration: width > 1000,
+                        showSubTitle: width > 500,
+                        style: width <= 500
+                            ? AudioTileStyle.normal
+                            : AudioTileStyle.compact,
+                        allowLeadingImage:
+                            audios.length < kShowLeadingThreshold,
+                        onSubTitleTap: onArtistTap,
+                        onSubSubTitleTap: onAlbumTap,
+                        key: ValueKey(audio.path ?? audio.url),
+                        isPlayerPlaying: isPlaying,
+                        onTap: () {
+                          if (audioSelected) {
+                            if (isPlaying) {
+                              playerModel.pause();
+                            } else {
+                              playerModel.resume();
+                            }
                           } else {
-                            playerModel.resume();
+                            playerModel.startPlaylist(
+                              audios: audios,
+                              listName: pageId,
+                              index: index,
+                            );
                           }
-                        } else {
-                          playerModel.startPlaylist(
-                            audios: audios,
-                            listName: pageId,
-                            index: index,
-                          );
-                        }
-                      },
-                      selected: audioSelected,
-                      audio: audio,
-                      pageId: pageId,
-                      audioPageType: AudioPageType.playlist,
+                        },
+                        selected: audioSelected,
+                        audio: audio,
+                        pageId: pageId,
+                        audioPageType: AudioPageType.playlist,
+                      ),
                     ),
-                  ),
-                );
-              },
-              onReorder: (oldIndex, newIndex) {
-                if (playerModel.queueName == pageId) {
-                  playerModel.moveAudioInQueue(oldIndex, newIndex);
-                }
-
-                localAudioManager.moveAudioInPlaylist(
-                  oldIndex: oldIndex,
-                  newIndex: newIndex,
-                  id: pageId,
-                );
-              },
-            )
-          : SliverAudioTileList(
-              audios: audios,
-              pageId: pageId,
-              audioPageType: AudioPageType.playlist,
-              onSubTitleTab: onArtistTap,
-              constraints: constraints,
-              onSubSubTitleTab: (Audio audio) {
-                if (audio.album == null || audio.artist == null) {
-                  showSnackBar(
-                    context: context,
-                    content: Text(context.l10n.nothingFound),
                   );
-                  return;
-                }
-                final id = di<LocalAudioManager>().findAlbumId(
-                  artist: audio.artist!,
-                  album: audio.album!,
-                );
+                },
+                onReorder: (oldIndex, newIndex) {
+                  if (playerModel.queueName == pageId) {
+                    playerModel.moveAudioInQueue(oldIndex, newIndex);
+                  }
 
-                if (id == null) {
-                  showSnackBar(
-                    context: context,
-                    content: Text(context.l10n.nothingFound),
+                  localAudioManager.moveAudioInPlaylist(
+                    oldIndex: oldIndex,
+                    newIndex: newIndex,
+                    id: pageId,
                   );
-                  return;
-                }
+                },
+              )
+            : SliverAudioTileList(
+                audios: audios,
+                pageId: pageId,
+                audioPageType: AudioPageType.playlist,
+                onSubTitleTab: onArtistTap,
+                constraints: constraints,
+                onSubSubTitleTab: (Audio audio) {
+                  if (audio.album == null || audio.artist == null) {
+                    context.toast(Text(context.l10n.nothingFound));
+                    return;
+                  }
+                  final id = di<LocalAudioManager>().findAlbumId(
+                    artist: audio.artist!,
+                    album: audio.album!,
+                  );
 
-                di<RoutingManager>().push(
-                  builder: (_) => AlbumPage(id: id),
-                  pageId: id.toString(),
-                );
-              },
-            ),
+                  if (id == null) {
+                    context.toast(Text(context.l10n.nothingFound));
+                    return;
+                  }
+
+                  di<RoutingManager>().push(
+                    builder: (_) => AlbumPage(id: id),
+                    pageId: id.toString(),
+                  );
+                },
+              );
+      },
     );
   }
 }

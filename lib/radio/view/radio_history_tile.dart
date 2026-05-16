@@ -7,7 +7,6 @@ import '../../common/view/copy_clipboard_content.dart';
 import '../../common/view/icons.dart';
 import '../../common/view/modals.dart';
 import '../../common/view/mpv_metadata_dialog.dart';
-import '../../common/view/snackbars.dart';
 import '../../common/view/tapable_text.dart';
 import '../../common/view/ui_constants.dart';
 import '../../extensions/build_context_x.dart';
@@ -50,12 +49,10 @@ class RadioHistoryTile extends StatelessWidget with WatchItMixin {
     );
     return switch (_variant) {
       _RadioHistoryTileVariant.simple => _SimpleRadioHistoryTile(
-        key: ValueKey(icyTitle),
         icyTitle: icyTitle,
         selected: selected,
       ),
       _RadioHistoryTileVariant.regular => ListTile(
-        key: ValueKey(icyTitle),
         selected: selected,
         selectedColor: context.theme.contrastyPrimary,
         contentPadding: const EdgeInsets.symmetric(horizontal: kLargestSpace),
@@ -65,33 +62,45 @@ class RadioHistoryTile extends StatelessWidget with WatchItMixin {
           width: useYaruTheme ? 34 : 40,
           icyTitle: icyTitle,
         ),
-        trailing: IconButton(
-          tooltip: context.l10n.metadata,
-          onPressed: () {
-            final imageUrl = di<OnlineArtModel>().getCover(icyTitle);
-            final metadata = di<MpvMetadataManager>().getMetadata(icyTitle);
-            if (metadata == null) return;
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: kSmallestSpace,
+          children: [
+            IconButton(
+              tooltip: context.l10n.metadata,
+              onPressed: () {
+                final imageUrl = di<OnlineArtModel>().getCover(icyTitle);
+                final metadata = di<MpvMetadataManager>().getMetadata(icyTitle);
+                if (metadata == null) return;
 
-            showModal(
-              mode: ModalMode.platformModalMode,
-              context: context,
-              content: MpvMetadataDialog(
-                mode: ModalMode.platformModalMode,
-                image: imageUrl,
-                mpvMetaData: metadata,
-              ),
-            );
-          },
-          icon: Icon(Iconz.info),
+                showModal(
+                  mode: ModalMode.platformModalMode,
+                  context: context,
+                  content: MpvMetadataDialog(
+                    mode: ModalMode.platformModalMode,
+                    image: imageUrl,
+                    mpvMetaData: metadata,
+                  ),
+                );
+              },
+              icon: Icon(Iconz.info),
+            ),
+            IconButton(
+              tooltip: context.l10n.ignoreThisTitleInHearingHistory,
+              onPressed: () =>
+                  di<MpvMetadataManager>().editBlockedIcyTitleCommand.run((
+                    title: icyTitle,
+                    addOrRemove: EditIcyTitleInHistory.add,
+                  )),
+              icon: Icon(Iconz.remove),
+            ),
+          ],
         ),
         title: TapAbleText(
           overflow: TextOverflow.visible,
           maxLines: 10,
           text: icyTitle,
-          onTap: () => showSnackBar(
-            context: context,
-            content: CopyClipboardContent(text: icyTitle),
-          ),
+          onTap: () => context.toast(CopyClipboardContent(text: icyTitle)),
         ),
         subtitle: TapAbleText(
           text: icyName ?? context.l10n.station,
@@ -116,7 +125,6 @@ class RadioHistoryTile extends StatelessWidget with WatchItMixin {
 
 class _SimpleRadioHistoryTile extends StatelessWidget {
   const _SimpleRadioHistoryTile({
-    super.key,
     required this.icyTitle,
     required this.selected,
   });
@@ -136,10 +144,7 @@ class _SimpleRadioHistoryTile extends StatelessWidget {
         overflow: TextOverflow.visible,
         maxLines: 10,
         text: icyTitle,
-        onTap: () => showSnackBar(
-          context: context,
-          content: CopyClipboardContent(text: icyTitle),
-        ),
+        onTap: () => context.toast(CopyClipboardContent(text: icyTitle)),
       ),
       subtitle: Text(
         di<MpvMetadataManager>().getMetadata(icyTitle)?.icyName ??
